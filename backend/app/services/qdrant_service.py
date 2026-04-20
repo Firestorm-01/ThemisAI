@@ -1,5 +1,4 @@
 import logging
-from functools import lru_cache
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
@@ -16,13 +15,21 @@ _qdrant_client: QdrantClient = None
 def get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
-        _qdrant_client = QdrantClient(
-            url=settings.qdrant_host,
-            
-            api_key=settings.qdrant_api_key,  # add this
-                                 # add this for cloud
-            timeout=30,
-        )
+        if settings.qdrant_api_key:
+            # Qdrant Cloud or TLS-enabled instance
+            _qdrant_client = QdrantClient(
+                url=settings.qdrant_host,
+                api_key=settings.qdrant_api_key,
+                timeout=30,
+            )
+        else:
+            # Local Docker — force plain HTTP
+            _qdrant_client = QdrantClient(
+                host=settings.qdrant_host,
+                port=settings.qdrant_port,
+                https=False,
+                timeout=30,
+            )
         logger.info(f"Qdrant connected at {settings.qdrant_host}:{settings.qdrant_port}")
     return _qdrant_client
 

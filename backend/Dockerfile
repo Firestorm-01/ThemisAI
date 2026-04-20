@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Added tesseract-ocr and libtesseract-dev
+# Install system dependencies (merged from both, ffmpeg always included)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
@@ -15,18 +15,25 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 
-# 1. Install specific build tools and legacy setuptools for Whisper
+# Upgrade pip and install legacy setuptools/wheel for compatibility (from v2)
 RUN pip install --no-cache-dir --upgrade pip "setuptools<70.0.0" wheel
 
-# 2. Install Whisper separately
-RUN pip install --no-cache-dir openai-whisper==20231117 --no-build-isolation
+# Conditionally install Whisper with build isolation disabled (safer, from v2)
+ARG ENABLE_VOICE=false
+RUN if [ "$ENABLE_VOICE" = "true" ]; then \
+      pip install --no-cache-dir openai-whisper==20231117 ffmpeg-python --no-build-isolation; \
+    fi
 
-# 3. Install the rest (Ensure pytesseract is in your requirements.txt!)
+# Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Pre-cache models
+# Pre-cache sentence transformer model
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-RUN python -c "import whisper; whisper.load_model('base')"
+
+# Pre-cache Whisper model only if voice is enabled
+RUN if [ "$ENABLE_VOICE" = "true" ]; then \
+      python -c "import whisper; whisper.load_model('base')"; \
+    fi
 
 COPY . .
 
