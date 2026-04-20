@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Send, Image as ImageIcon, X, Loader, Scale, Trash2 } from 'lucide-react'
+import { Send, Image as ImageIcon, X, Scale, Trash2, BookOpen } from 'lucide-react'
 import SourcesPanel from '../components/SourcesPanel'
 import AudioRecorder from '../components/AudioRecorder'
 import { queryText, queryAudio, queryImage } from '../utils/api'
@@ -13,28 +13,42 @@ const WELCOME = {
   role: 'ai',
   content: `**Namaste! I am ThemisAI.**
 
-I am your Indian legal research assistant. Ask me anything about:
+Ask me anything about:
 - **IPC 1860** — offences, punishments, definitions
 - **Constitution of India** — fundamental rights, articles
 - **CrPC 1973** — procedure, bail, arrest, FIR
 - **Landmark judgments** — Supreme Court precedents
 
-You may also upload documents (PDF, images) via the Evidence page, or send a voice query using the microphone.
+Upload documents via the Evidence tab, or use the 🎙 mic for voice queries.
 
-*All responses are grounded in retrieved sources. No hallucinations.*`,
+*All responses cite sources. No hallucinations.*`,
   sources: [],
   graphContext: [],
   modality: 'text',
 }
 
+// Detect mobile
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 768)
+    window.addEventListener('resize', fn, { passive: true })
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return mobile
+}
+
 export default function Chat() {
-  const [messages, setMessages]     = useState([WELCOME])
-  const [input, setInput]           = useState('')
-  const [loading, setLoading]       = useState(false)
-  const [imageFile, setImageFile]   = useState(null)
+  const [messages, setMessages]         = useState([WELCOME])
+  const [input, setInput]               = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [imageFile, setImageFile]       = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [activeSources, setActiveSources] = useState({ sources: [], graphContext: [] })
-  const [topK]                      = useState(5)
+  // Mobile: show sources drawer
+  const [showSources, setShowSources]   = useState(false)
+  const [topK]                          = useState(5)
+  const isMobile                        = useIsMobile()
 
   const messagesEndRef = useRef(null)
   const inputRef       = useRef(null)
@@ -49,8 +63,7 @@ export default function Chat() {
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), ...msg }])
   }, [])
 
-  const handleTextSubmit = useCallback(async (e) => {
-    e?.preventDefault()
+  const handleTextSubmit = useCallback(async () => {
     const query = input.trim()
     if (!query && !imageFile) return
     if (loading) return
@@ -59,12 +72,12 @@ export default function Chat() {
     setInput('')
 
     if (imageFile) {
-      // Image query mode
       addMessage({ role: 'user', content: query || 'What legal information does this document contain?', modality: 'image', imagePreview })
+      const capturedFile = imageFile
       setImageFile(null)
       setImagePreview(null)
       try {
-        const res = await queryImage(imageFile, query || undefined, topK)
+        const res = await queryImage(capturedFile, query || undefined, topK)
         addMessage({ role: 'ai', content: res.answer, sources: res.sources, graphContext: res.graph_context || [], modality: 'image', queryUsed: res.query_used })
         setActiveSources({ sources: res.sources, graphContext: res.graph_context || [] })
       } catch (err) {
@@ -72,7 +85,6 @@ export default function Chat() {
         addToast(err.message, 'error')
       }
     } else {
-      // Text query
       addMessage({ role: 'user', content: query, modality: 'text' })
       try {
         const res = await queryText(query, topK, true)
@@ -84,7 +96,6 @@ export default function Chat() {
       }
     }
     setLoading(false)
-    inputRef.current?.focus()
   }, [input, imageFile, imagePreview, loading, topK, addMessage, addToast])
 
   const handleAudioSubmit = useCallback(async (audioBlob) => {
@@ -94,7 +105,6 @@ export default function Chat() {
     try {
       const ext = audioBlob.type.includes('webm') ? 'webm' : 'wav'
       const res = await queryAudio(audioBlob, `recording.${ext}`, topK)
-      // Replace placeholder with actual transcript
       setMessages(prev => {
         const updated = [...prev]
         const last = updated.findLastIndex(m => m.role === 'user' && m.modality === 'audio')
@@ -127,238 +137,330 @@ export default function Chat() {
     setInput('')
     setImageFile(null)
     setImagePreview(null)
+    setShowSources(false)
   }, [])
 
+  // Desktop: Enter sends. Mobile: Enter = newline (use send button)
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSubmit() }
+    if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
+      e.preventDefault()
+      handleTextSubmit()
+    }
   }
 
+  const canSend = !loading && (input.trim().length > 0 || !!imageFile)
+
   return (
-    <div style={{
-      height: 'calc(100vh - 68px)',
-      display: 'grid',
-      gridTemplateColumns: '1fr 300px',
-      background: 'var(--parch)',
-      overflow: 'hidden',
-    }}>
+    <>
+      <style>{`
+        .chat-root {
+          height: calc(100dvh - 68px);
+          display: flex;
+          flex-direction: column;
+          background: var(--parch);
+          overflow: hidden;
+          position: relative;
+        }
+        .chat-inner {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 1fr 300px;
+          overflow: hidden;
+          min-height: 0;
+        }
+        @media (max-width: 767px) {
+          .chat-inner { grid-template-columns: 1fr; }
+          .sources-sidebar { display: none !important; }
+        }
+        .messages-area {
+          flex: 1; overflow-y: auto;
+          padding: 1rem 1rem 0.5rem;
+          display: flex; flex-direction: column; gap: 1rem;
+          -webkit-overflow-scrolling: touch;
+        }
+        @media (min-width: 768px) {
+          .messages-area { padding: 1.5rem 1.5rem 0.5rem; gap: 1.2rem; }
+        }
+        .bubble-max { max-width: 78%; }
+        @media (max-width: 767px) { .bubble-max { max-width: 88%; } }
+        .input-bar {
+          background: var(--parch2);
+          border-top: 3px solid var(--outline);
+          padding: 0.7rem 0.8rem;
+          display: flex; gap: 0.5rem; align-items: flex-end;
+          flex-shrink: 0;
+        }
+        @media (min-width: 768px) { .input-bar { padding: 0.9rem 1.2rem; gap: 0.6rem; } }
+        .chat-textarea {
+          flex: 1;
+          background: var(--white);
+          border: 3px solid var(--outline);
+          border-radius: 14px;
+          padding: 0.6rem 0.9rem;
+          font-family: 'Nunito Sans', sans-serif;
+          font-weight: 700;
+          /* 16px minimum to prevent iOS zoom */
+          font-size: 16px;
+          color: var(--ink);
+          outline: none;
+          box-shadow: 2px 2px 0 var(--outline);
+          resize: none;
+          min-height: 44px;
+          max-height: 110px;
+          line-height: 1.45;
+          -webkit-appearance: none;
+          transition: box-shadow 0.15s;
+        }
+        .chat-textarea:focus { box-shadow: 3px 3px 0 var(--outline); }
+        .icon-btn {
+          width: 44px; height: 44px;
+          border-radius: 50%;
+          border: 3px solid var(--outline);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 2px 2px 0 var(--outline);
+          flex-shrink: 0;
+          cursor: pointer;
+          transition: transform 0.12s, box-shadow 0.12s;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .icon-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--outline); }
+        /* Sources drawer (mobile) */
+        .sources-drawer-overlay {
+          display: none;
+          position: fixed; inset: 0; z-index: 300;
+          background: rgba(6,44,67,0.5);
+          backdrop-filter: blur(2px);
+        }
+        .sources-drawer {
+          position: fixed; bottom: 0; left: 0; right: 0; z-index: 301;
+          background: var(--parch2);
+          border-top: 3px solid var(--outline);
+          border-radius: 20px 20px 0 0;
+          max-height: 70dvh;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        @media (max-width: 767px) {
+          .sources-drawer-overlay { display: block; }
+        }
+      `}</style>
 
-      {/* ── LEFT: CHAT PANEL ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className="chat-root">
 
-        {/* Chat topbar */}
+        {/* ── TOPBAR ── */}
         <div style={{
           background: 'var(--ink)',
           borderBottom: '3px solid var(--gold)',
-          padding: '0.75rem 1.5rem',
+          padding: '0.7rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexShrink: 0,
+          gap: '0.5rem',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Scale size={18} color="var(--gold)" />
-            <span style={{
-              fontFamily: "'Fredoka One', cursive",
-              fontSize: '1rem', color: 'var(--gold)', letterSpacing: '0.04em',
-            }}>Case Room</span>
-            <span className="tag tag-navy" style={{ fontSize: '0.58rem' }}>§ Active</span>
+            <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--gold)' }}>
+              Case Room
+            </span>
+            <span className="tag tag-navy" style={{ fontSize: '0.55rem' }}>Active</span>
           </div>
-          <button
-            onClick={clearChat}
-            title="Clear conversation"
-            style={{
-              background: 'none', border: 'none', color: 'var(--steel)',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-              fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.72rem',
-              cursor: 'pointer', padding: '0.3rem 0.6rem',
-              borderRadius: 8, transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--steel)'}
-          >
-            <Trash2 size={13} /> Clear
-          </button>
-        </div>
 
-        {/* Messages */}
-        <div style={{
-          flex: 1, overflowY: 'auto',
-          padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem',
-        }}>
-          <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <ChatMessage
-                key={msg.id}
-                msg={msg}
-                onClickSources={() => {
-                  if (msg.sources?.length || msg.graphContext?.length) {
-                    setActiveSources({ sources: msg.sources || [], graphContext: msg.graphContext || [] })
-                  }
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Mobile: sources toggle */}
+            {isMobile && (
+              <button
+                onClick={() => setShowSources(true)}
+                style={{
+                  background: activeSources.sources.length ? 'rgba(229,168,48,0.15)' : 'none',
+                  border: activeSources.sources.length ? '2px solid var(--gold)' : '2px solid transparent',
+                  borderRadius: 50,
+                  padding: '0.3rem 0.7rem',
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  color: activeSources.sources.length ? 'var(--gold)' : 'var(--steel)',
+                  fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: '0.72rem',
+                  cursor: 'pointer',
                 }}
-              />
-            ))}
-          </AnimatePresence>
-
-          {loading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ display: 'flex', gap: '0.7rem', alignItems: 'flex-start' }}
-            >
-              <AiAvatar />
-              <div style={{
-                background: 'var(--white)',
-                border: '3px solid var(--outline)',
-                borderLeft: '4px solid var(--steel)',
-                borderRadius: '4px 18px 18px 18px',
-                padding: '0.9rem 1.1rem',
-                display: 'flex', alignItems: 'center', gap: '0.6rem',
-                boxShadow: '3px 3px 0 var(--outline)',
-              }}>
-                <div className="spinner" style={{ width: 18, height: 18 }} />
-                <span style={{
-                  fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-                  fontSize: '0.78rem', color: 'var(--steel)',
-                }}>Retrieving from corpus…</span>
-              </div>
-            </motion.div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Image preview strip */}
-        <AnimatePresence>
-          {imagePreview && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              >
+                <BookOpen size={13} />
+                Sources {activeSources.sources.length > 0 && `(${activeSources.sources.length})`}
+              </button>
+            )}
+            <button
+              onClick={clearChat}
               style={{
-                background: 'var(--parch2)',
-                borderTop: '2px solid var(--outline)',
-                padding: '0.6rem 1.5rem',
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                flexShrink: 0,
+                background: 'none', border: 'none', color: 'var(--steel)',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.72rem',
+                cursor: 'pointer', padding: '0.3rem 0.5rem', borderRadius: 8,
               }}
             >
-              <img
-                src={imagePreview} alt="Selected"
-                style={{ height: 50, width: 50, objectFit: 'cover', border: '2px solid var(--outline)', borderRadius: 8 }}
-              />
-              <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.75rem', color: 'var(--steel)' }}>
-                {imageFile?.name}
-              </span>
+              <Trash2 size={13} />
+              {!isMobile && 'Clear'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── MAIN AREA ── */}
+        <div className="chat-inner">
+
+          {/* Chat column */}
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+
+            {/* Messages */}
+            <div className="messages-area">
+              <AnimatePresence initial={false}>
+                {messages.map((msg) => (
+                  <ChatMessage
+                    key={msg.id}
+                    msg={msg}
+                    onClickSources={() => {
+                      if (msg.sources?.length || msg.graphContext?.length) {
+                        setActiveSources({ sources: msg.sources || [], graphContext: msg.graphContext || [] })
+                        if (isMobile) setShowSources(true)
+                      }
+                    }}
+                  />
+                ))}
+              </AnimatePresence>
+
+              {loading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  style={{ display: 'flex', gap: '0.7rem', alignItems: 'flex-start' }}>
+                  <AiAvatar />
+                  <div style={{
+                    background: 'var(--white)', border: '3px solid var(--outline)',
+                    borderLeft: '4px solid var(--steel)', borderRadius: '4px 18px 18px 18px',
+                    padding: '0.8rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    boxShadow: '3px 3px 0 var(--outline)',
+                  }}>
+                    <div className="spinner" style={{ width: 16, height: 16 }} />
+                    <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.78rem', color: 'var(--steel)' }}>
+                      Retrieving from corpus…
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Image preview strip */}
+            <AnimatePresence>
+              {imagePreview && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                  style={{
+                    background: 'var(--parch2)', borderTop: '2px solid var(--outline)',
+                    padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.7rem', flexShrink: 0,
+                  }}
+                >
+                  <img src={imagePreview} alt="Selected"
+                    style={{ height: 44, width: 44, objectFit: 'cover', border: '2px solid var(--outline)', borderRadius: 8 }} />
+                  <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.72rem', color: 'var(--steel)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {imageFile?.name}
+                  </span>
+                  <button onClick={() => { setImageFile(null); setImagePreview(null) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4, minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={16} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── INPUT BAR ── */}
+            <div className="input-bar">
+              <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageSelect} />
+
+              {/* Image attach */}
               <button
-                onClick={() => { setImageFile(null); setImagePreview(null) }}
-                style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                className="icon-btn"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={loading}
+                style={{
+                  background: imageFile ? 'var(--gold)' : 'var(--white)',
+                  opacity: loading ? 0.5 : 1,
+                }}
               >
-                <X size={16} />
+                <ImageIcon size={16} color={imageFile ? 'var(--ink)' : 'var(--steel)'} />
               </button>
-            </motion.div>
+
+              {/* Audio */}
+              <AudioRecorder onSubmit={handleAudioSubmit} disabled={loading} />
+
+              {/* Textarea */}
+              <textarea
+                ref={inputRef}
+                className="chat-textarea"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={loading}
+                placeholder={imageFile ? 'Ask about this image…' : 'Query IPC, Constitution, judgments…'}
+                rows={1}
+              />
+
+              {/* Send */}
+              <motion.button
+                className="icon-btn"
+                whileTap={{ scale: canSend ? 0.93 : 1 }}
+                onClick={handleTextSubmit}
+                disabled={!canSend}
+                style={{
+                  background: canSend ? 'var(--gold)' : 'var(--mist)',
+                  cursor: canSend ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {loading
+                  ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                  : <Send size={16} color={canSend ? 'var(--ink)' : 'var(--steel)'} />
+                }
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Desktop sources sidebar */}
+          <div className="sources-sidebar" style={{
+            borderLeft: '3px solid var(--outline)',
+            background: 'var(--parch2)',
+            display: 'flex', flexDirection: 'column',
+            height: '100%', overflow: 'hidden',
+          }}>
+            <SourcesPanel sources={activeSources.sources} graphContext={activeSources.graphContext} />
+          </div>
+        </div>
+
+        {/* ── MOBILE SOURCES DRAWER ── */}
+        <AnimatePresence>
+          {isMobile && showSources && (
+            <>
+              <motion.div
+                className="sources-drawer-overlay"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setShowSources(false)}
+              />
+              <motion.div
+                className="sources-drawer"
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              >
+                {/* Drawer handle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.2rem 0.5rem', borderBottom: '2px solid var(--outline)' }}>
+                  <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--ink)' }}>
+                    📚 Sources
+                  </span>
+                  <button onClick={() => setShowSources(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--steel)', padding: 6, minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <div style={{ padding: '0 0 env(safe-area-inset-bottom, 1rem)' }}>
+                  <SourcesPanel sources={activeSources.sources} graphContext={activeSources.graphContext} />
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
 
-        {/* Input bar */}
-        <div style={{
-          background: 'var(--parch2)',
-          borderTop: '3px solid var(--outline)',
-          padding: '0.9rem 1.2rem',
-          display: 'flex', gap: '0.6rem', alignItems: 'flex-end',
-          flexShrink: 0,
-        }}>
-          {/* Image attach */}
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleImageSelect}
-          />
-          <button
-            onClick={() => imageInputRef.current?.click()}
-            disabled={loading}
-            title="Attach image"
-            style={{
-              width: 38, height: 38, borderRadius: '50%',
-              background: imageFile ? 'var(--gold)' : 'var(--white)',
-              border: '3px solid var(--outline)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '2px 2px 0 var(--outline)',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
-              opacity: loading ? 0.5 : 1,
-            }}
-          >
-            <ImageIcon size={15} color={imageFile ? 'var(--ink)' : 'var(--steel)'} />
-          </button>
-
-          {/* Audio recorder */}
-          <AudioRecorder onSubmit={handleAudioSubmit} disabled={loading} />
-
-          {/* Text input */}
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-            placeholder={imageFile ? 'Ask a question about this image…' : 'Query the IPC, Constitution, judgments…'}
-            rows={1}
-            style={{
-              flex: 1,
-              background: 'var(--white)',
-              border: '3px solid var(--outline)',
-              borderRadius: 14,
-              padding: '0.6rem 1rem',
-              fontFamily: "'Nunito Sans', sans-serif",
-              fontWeight: 700, fontSize: '0.84rem',
-              color: 'var(--ink)',
-              outline: 'none',
-              boxShadow: '2px 2px 0 var(--outline)',
-              resize: 'none',
-              minHeight: 42, maxHeight: 120,
-              lineHeight: 1.5,
-              transition: 'box-shadow 0.15s',
-            }}
-            onFocus={e => e.target.style.boxShadow = '3px 3px 0 var(--outline)'}
-            onBlur={e  => e.target.style.boxShadow = '2px 2px 0 var(--outline)'}
-          />
-
-          {/* Send */}
-          <motion.button
-            whileHover={{ scale: loading ? 1 : 1.05 }}
-            whileTap={{ scale: loading ? 1 : 0.95 }}
-            onClick={handleTextSubmit}
-            disabled={loading || (!input.trim() && !imageFile)}
-            style={{
-              width: 42, height: 42, borderRadius: '50%',
-              background: loading || (!input.trim() && !imageFile) ? 'var(--mist)' : 'var(--gold)',
-              border: '3px solid var(--outline)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '2px 2px 0 var(--outline)',
-              cursor: loading || (!input.trim() && !imageFile) ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
-              transition: 'background 0.15s',
-            }}
-          >
-            {loading
-              ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-              : <Send size={16} color={!input.trim() && !imageFile ? 'var(--steel)' : 'var(--ink)'} />
-            }
-          </motion.button>
-        </div>
       </div>
-
-      {/* ── RIGHT: SOURCES PANEL ── */}
-      <div style={{
-        borderLeft: '3px solid var(--outline)',
-        background: 'var(--parch2)',
-        display: 'flex', flexDirection: 'column',
-        height: '100%', overflow: 'hidden',
-      }}>
-        <SourcesPanel sources={activeSources.sources} graphContext={activeSources.graphContext} />
-      </div>
-
-    </div>
+    </>
   )
 }
 
@@ -369,18 +471,18 @@ function ChatMessage({ msg, onClickSources }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      style={{ display: 'flex', gap: '0.7rem', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}
+      transition={{ duration: 0.22 }}
+      style={{ display: 'flex', gap: '0.6rem', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}
     >
       {isUser ? <UserAvatar /> : <AiAvatar />}
 
-      <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <div className="bubble-max" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
         <div style={{
           fontFamily: "'Fredoka One', cursive",
-          fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase',
+          fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase',
           color: isUser ? 'var(--gold-dark)' : 'var(--steel)',
           textAlign: isUser ? 'right' : 'left',
         }}>
@@ -389,24 +491,21 @@ function ChatMessage({ msg, onClickSources }) {
 
         <div style={{
           background: isError ? '#fdf0ef' : isUser ? 'var(--navy)' : 'var(--white)',
-          border: `3px solid var(--outline)`,
+          border: '3px solid var(--outline)',
           borderLeft: !isUser ? `4px solid ${isError ? 'var(--danger)' : 'var(--steel)'}` : '3px solid var(--outline)',
           borderRight: isUser ? '4px solid var(--gold)' : '3px solid var(--outline)',
           borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
-          padding: '0.85rem 1.1rem',
+          padding: '0.75rem 0.95rem',
           boxShadow: '3px 3px 0 var(--outline)',
+          wordBreak: 'break-word',
         }}>
-          {/* Image preview in message */}
           {msg.imagePreview && (
-            <img
-              src={msg.imagePreview} alt="Query image"
-              style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, marginBottom: '0.5rem', display: 'block', border: '2px solid var(--outline)' }}
-            />
+            <img src={msg.imagePreview} alt="Query image"
+              style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8, marginBottom: '0.5rem', display: 'block', border: '2px solid var(--outline)' }} />
           )}
-
           <div className={isUser ? '' : 'markdown-body'} style={{
             color: isUser ? 'var(--mist)' : isError ? 'var(--danger)' : 'var(--ink)',
-            fontSize: '0.84rem',
+            fontSize: '0.86rem',
           }}>
             {isUser || isError
               ? <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, lineHeight: 1.6 }}>{msg.content}</span>
@@ -415,24 +514,24 @@ function ChatMessage({ msg, onClickSources }) {
           </div>
         </div>
 
-        {/* Source tags row */}
+        {/* Source tags — tap to open sources */}
         {!isUser && !isError && msg.sources?.length > 0 && (
           <button
             onClick={onClickSources}
             style={{
               background: 'none', border: 'none', padding: 0,
-              display: 'flex', gap: '0.35rem', flexWrap: 'wrap', cursor: 'pointer',
-              alignSelf: 'flex-start',
+              display: 'flex', gap: '0.3rem', flexWrap: 'wrap', cursor: 'pointer',
+              alignSelf: 'flex-start', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            {msg.sources.slice(0, 3).map((s, i) => (
-              <span key={i} className="tag" style={{ fontSize: '0.58rem' }}>
-                § {s.title.length > 28 ? s.title.slice(0, 28) + '…' : s.title}
+            {msg.sources.slice(0, 2).map((s, i) => (
+              <span key={i} className="tag" style={{ fontSize: '0.56rem' }}>
+                § {s.title.length > 24 ? s.title.slice(0, 24) + '…' : s.title}
               </span>
             ))}
-            {msg.sources.length > 3 && (
-              <span className="tag tag-navy" style={{ fontSize: '0.58rem' }}>
-                +{msg.sources.length - 3} more
+            {msg.sources.length > 2 && (
+              <span className="tag tag-navy" style={{ fontSize: '0.56rem' }}>
+                +{msg.sources.length - 2} more
               </span>
             )}
           </button>
@@ -445,12 +544,12 @@ function ChatMessage({ msg, onClickSources }) {
 function AiAvatar() {
   return (
     <div style={{
-      width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
       background: 'var(--navy)', border: '3px solid var(--outline)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '2px 2px 0 var(--outline)',
     }}>
-      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '0.68rem', color: 'var(--gold)' }}>AI</span>
+      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '0.62rem', color: 'var(--gold)' }}>AI</span>
     </div>
   )
 }
@@ -458,12 +557,12 @@ function AiAvatar() {
 function UserAvatar() {
   return (
     <div style={{
-      width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
       background: 'var(--gold)', border: '3px solid var(--outline)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '2px 2px 0 var(--outline)',
     }}>
-      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '0.68rem', color: 'var(--ink)' }}>YOU</span>
+      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '0.62rem', color: 'var(--ink)' }}>YOU</span>
     </div>
   )
 }

@@ -96,7 +96,7 @@ export default function Ingest() {
   const doneCount    = queue.filter(i => i.status === 'done').length
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 68px)', background: 'var(--parch)', padding: '3rem 5%', position: 'relative', zIndex: 1 }}>
+    <div style={{ minHeight: 'calc(100dvh - 68px)', background: 'var(--parch)', padding: 'clamp(1.5rem, 4vw, 3rem) 5%', position: 'relative', zIndex: 1 }}>
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
 
         {/* Header */}
@@ -129,7 +129,7 @@ export default function Ingest() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
-          style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}
+          className="ingest-type-strip" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}
         >
           {[
             { label: 'PDF Statutes',   icon: '📜', sub: '.pdf' },

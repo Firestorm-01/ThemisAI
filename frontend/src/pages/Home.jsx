@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Scale, FileText, Network, ArrowRight, Upload } from 'lucide-react'
+import { ArrowRight, Upload } from 'lucide-react'
 import { fetchHealth } from '../utils/api'
 
 const fadeUp = (delay = 0) => ({
@@ -20,19 +20,36 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--parch)', position: 'relative', zIndex: 1 }}>
+      <style>{`
+        .hero-section {
+          min-height: 100svh;
+          display: flex; align-items: center;
+          padding: 5rem 5% 3rem;
+          gap: 2rem;
+          max-width: 1200px; margin: 0 auto;
+          flex-wrap: wrap;
+        }
+        .hero-svg-wrap { flex: 0 0 auto; display: flex; justify-content: center; }
+        .stat-pill-row { display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap; }
+        .pipeline-row  { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; align-items: center; }
+        .pipeline-arrow { font-family: 'Fredoka One', cursive; font-size: 1.3rem; color: var(--steel); padding: 0 0.1rem; }
+        @media (max-width: 640px) {
+          .hero-svg-wrap  { display: none !important; }
+          .stat-pill-row  { gap: 0.6rem; }
+          .pipeline-arrow { display: none; }
+          .hero-section   { padding-top: 6rem; padding-bottom: 2rem; }
+          .features-grid  { grid-template-columns: 1fr !important; }
+        }
+        @media (min-width: 641px) and (max-width: 900px) {
+          .features-grid { grid-template-columns: repeat(2,1fr) !important; }
+        }
+      `}</style>
 
       {/* ── HERO ── */}
-      <section style={{
-        minHeight: '100vh',
-        display: 'flex', alignItems: 'center',
-        padding: '0 5%',
-        gap: '3rem',
-        maxWidth: 1200, margin: '0 auto',
-        flexWrap: 'wrap',
-      }}>
+      <section className="hero-section">
 
         {/* Left */}
-        <div style={{ flex: '1 1 400px', paddingTop: '5rem' }}>
+        <div style={{ flex: '1 1 300px' }}>
           <motion.div {...fadeUp(0.05)}>
             <span className="tag tag-navy" style={{ marginBottom: '1.2rem', display: 'inline-flex' }}>
               ⚖ Indian Legal Intelligence
@@ -41,7 +58,7 @@ export default function Home() {
 
           <motion.h1 {...fadeUp(0.15)} style={{
             fontFamily: "'Fredoka One', cursive",
-            fontSize: 'clamp(3rem, 6vw, 5.2rem)',
+            fontSize: 'clamp(2.6rem, 6vw, 5.2rem)',
             lineHeight: 1.05,
             color: 'var(--ink)',
             marginBottom: '0.5rem',
@@ -58,15 +75,15 @@ export default function Home() {
 
           <motion.p {...fadeUp(0.28)} style={{
             fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-            fontSize: '1.05rem', color: 'var(--steel)',
+            fontSize: '1rem', color: 'var(--steel)',
             lineHeight: 1.7, maxWidth: 460,
-            margin: '1rem 0 2rem',
+            margin: '1rem 0 1.5rem',
           }}>
             Multi-modal RAG for the IPC, Constitution, CrPC &amp; landmark judgments.
             Text, documents, images, voice — zero hallucinations, full citations.
           </motion.p>
 
-          <motion.div {...fadeUp(0.4)} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <motion.div {...fadeUp(0.4)} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={() => navigate('/chat')}>
               Open a Case <ArrowRight size={16} />
             </button>
@@ -76,9 +93,7 @@ export default function Home() {
           </motion.div>
 
           {/* Stats */}
-          <motion.div {...fadeUp(0.52)} style={{
-            display: 'flex', gap: '1rem', marginTop: '2.5rem', flexWrap: 'wrap',
-          }}>
+          <motion.div {...fadeUp(0.52)} className="stat-pill-row">
             {[
               { num: 'IPC', label: 'Full Corpus' },
               { num: '3+',  label: 'Modalities' },
@@ -88,12 +103,12 @@ export default function Home() {
                 background: 'var(--white)',
                 border: '3px solid var(--outline)',
                 borderRadius: 'var(--radius-md)',
-                padding: '0.6rem 1.1rem',
+                padding: '0.55rem 1rem',
                 boxShadow: 'var(--shadow-sm)',
-                textAlign: 'center', minWidth: 88,
+                textAlign: 'center', minWidth: 80,
               }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', color: 'var(--navy)' }}>{num}</div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--steel)' }}>{label}</div>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', color: 'var(--navy)' }}>{num}</div>
+                <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--steel)' }}>{label}</div>
               </div>
             ))}
             {health && (
@@ -101,27 +116,27 @@ export default function Home() {
                 background: 'var(--white)',
                 border: '3px solid var(--outline)',
                 borderRadius: 'var(--radius-md)',
-                padding: '0.6rem 1.1rem',
+                padding: '0.55rem 1rem',
                 boxShadow: 'var(--shadow-sm)',
-                textAlign: 'center', minWidth: 88,
+                textAlign: 'center', minWidth: 80,
               }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', color: 'var(--success)' }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', color: health.status === 'ok' ? 'var(--success)' : 'var(--danger)' }}>
                   {health.status === 'ok' ? '✓' : '!'}
                 </div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--steel)' }}>
-                  {health.status === 'ok' ? `${(health.collections?.text_vectors ?? 0)} docs` : 'offline'}
+                <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--steel)' }}>
+                  {health.status === 'ok' ? `${health.collections?.text_vectors ?? 0} docs` : 'offline'}
                 </div>
               </div>
             )}
           </motion.div>
         </div>
 
-        {/* Right — clean SVG illustration */}
+        {/* Right — SVG illustration (hidden on mobile) */}
         <motion.div
+          className="hero-svg-wrap"
           initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center' }}
         >
           <HeroIllustration />
         </motion.div>
@@ -131,13 +146,11 @@ export default function Home() {
       <WaveDivider flip={false} fill="var(--navy)" />
 
       {/* ── FEATURES ── */}
-      <section style={{ background: 'var(--navy)', padding: '5rem 5%' }}>
+      <section style={{ background: 'var(--navy)', padding: '4rem 5%' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.5 }}
           >
             <div style={{
               fontFamily: "'Fredoka One', cursive", fontSize: '0.78rem',
@@ -145,32 +158,24 @@ export default function Home() {
               color: 'var(--ice)', marginBottom: '0.4rem',
             }}>§ 01 — Capabilities</div>
             <h2 style={{
-              fontFamily: "'Fredoka One', cursive", fontSize: '2.4rem',
-              color: 'var(--gold)', marginBottom: '2.5rem',
+              fontFamily: "'Fredoka One', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
+              color: 'var(--gold)', marginBottom: '2rem',
               textShadow: '2px 2px 0 var(--gold-dark)',
             }}>What ThemisAI Can Do</h2>
           </motion.div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.2rem' }}>
             {FEATURES.map((f, i) => (
               <motion.div
                 key={f.title}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.45, delay: i * 0.1 }}
+                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
                 className="card"
-                style={{ padding: '1.8rem 1.5rem', background: 'var(--parch)' }}
+                style={{ padding: '1.5rem 1.3rem', background: 'var(--parch)' }}
               >
-                <div style={{ fontSize: '2.4rem', marginBottom: '0.7rem' }}>{f.icon}</div>
-                <h3 style={{
-                  fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem',
-                  color: 'var(--ink)', marginBottom: '0.5rem',
-                }}>{f.title}</h3>
-                <p style={{
-                  fontFamily: "'Nunito', sans-serif", fontWeight: 600,
-                  fontSize: '0.8rem', color: 'var(--steel)', lineHeight: 1.65,
-                }}>{f.desc}</p>
+                <div style={{ fontSize: '2.2rem', marginBottom: '0.6rem' }}>{f.icon}</div>
+                <h3 style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--ink)', marginBottom: '0.45rem' }}>{f.title}</h3>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: '0.8rem', color: 'var(--steel)', lineHeight: 1.65 }}>{f.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -181,55 +186,37 @@ export default function Home() {
       <WaveDivider flip={true} fill="var(--navy)" />
 
       {/* ── HOW IT WORKS ── */}
-      <section style={{ background: 'var(--parch)', padding: '5rem 5%' }}>
+      <section style={{ background: 'var(--parch)', padding: '4rem 5%' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 style={{
-              fontFamily: "'Fredoka One', cursive", fontSize: '2.2rem',
-              color: 'var(--ink)', marginBottom: '0.5rem',
-            }}>How It Works</h2>
-            <p style={{
-              color: 'var(--steel)', fontWeight: 700, fontSize: '0.9rem',
-              maxWidth: 500, margin: '0 auto 3rem',
-            }}>
-              A production-grade RAG pipeline under the hood — transparent retrieval, no black boxes.
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+            <h2 style={{ fontFamily: "'Fredoka One', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.2rem)', color: 'var(--ink)', marginBottom: '0.5rem' }}>
+              How It Works
+            </h2>
+            <p style={{ color: 'var(--steel)', fontWeight: 700, fontSize: '0.9rem', maxWidth: 500, margin: '0 auto 2.5rem' }}>
+              A production-grade RAG pipeline — transparent retrieval, no black boxes.
             </p>
           </motion.div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0', justifyContent: 'center', alignItems: 'center' }}>
+          <div className="pipeline-row">
             {PIPELINE.map((step, i) => (
               <React.Fragment key={step.label}>
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
+                  initial={{ opacity: 0, scale: 0.85 }} whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }} transition={{ delay: i * 0.08 }}
                   style={{
                     background: 'var(--white)',
                     border: '3px solid var(--outline)',
                     borderRadius: 'var(--radius-lg)',
-                    padding: '1.2rem 1rem',
+                    padding: '1rem 0.85rem',
                     textAlign: 'center',
                     boxShadow: 'var(--shadow-sm)',
-                    minWidth: 110, maxWidth: 130,
+                    minWidth: 90, maxWidth: 120,
                   }}
                 >
-                  <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>{step.icon}</div>
-                  <div style={{
-                    fontFamily: "'Fredoka One', cursive", fontSize: '0.82rem',
-                    color: 'var(--navy)', lineHeight: 1.3,
-                  }}>{step.label}</div>
+                  <div style={{ fontSize: '1.6rem', marginBottom: '0.35rem' }}>{step.icon}</div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '0.78rem', color: 'var(--navy)', lineHeight: 1.3 }}>{step.label}</div>
                 </motion.div>
-                {i < PIPELINE.length - 1 && (
-                  <div style={{
-                    fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem',
-                    color: 'var(--steel)', padding: '0 0.3rem',
-                  }}>→</div>
-                )}
+                {i < PIPELINE.length - 1 && <div className="pipeline-arrow">→</div>}
               </React.Fragment>
             ))}
           </div>
@@ -237,24 +224,13 @@ export default function Home() {
       </section>
 
       {/* ── CTA ── */}
-      <section style={{
-        background: 'var(--ink)', padding: '4rem 5%',
-        textAlign: 'center', borderTop: '4px solid var(--gold)',
-      }}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
+      <section style={{ background: 'var(--ink)', padding: '4rem 5%', textAlign: 'center', borderTop: '4px solid var(--gold)' }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
           <h2 style={{
-            fontFamily: "'Fredoka One', cursive", fontSize: '2.4rem',
-            color: 'var(--gold)', marginBottom: '0.8rem',
-            textShadow: '3px 3px 0 var(--gold-dark)',
+            fontFamily: "'Fredoka One', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
+            color: 'var(--gold)', marginBottom: '0.8rem', textShadow: '3px 3px 0 var(--gold-dark)',
           }}>Ready to open your case?</h2>
-          <p style={{
-            color: 'var(--steel)', fontWeight: 700, fontSize: '0.9rem',
-            marginBottom: '2rem',
-          }}>
+          <p style={{ color: 'var(--steel)', fontWeight: 700, fontSize: '0.9rem', marginBottom: '2rem' }}>
             Query IPC, Constitution, CrPC — or upload your own legal documents.
           </p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -273,108 +249,66 @@ export default function Home() {
       <footer style={{
         background: 'var(--ink)', borderTop: '4px solid var(--gold)',
         padding: '1.5rem 5%',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.8rem',
       }}>
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--gold)', textShadow: '2px 2px 0 var(--gold-dark)' }}>
           ⚖ ThemisAI
         </span>
-        <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.7rem', color: 'var(--steel)', letterSpacing: '0.08em' }}>
-           Justice, Retrieved. Multi-Modal Graph RAG for Indian Law.
+        <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: '0.68rem', color: 'var(--steel)', letterSpacing: '0.06em' }}>
+           Justice, Retrieved.
         </span>
       </footer>
     </div>
   )
 }
 
-/* ── Sub-components ── */
-
+/* ── SVG Illustration ── */
 function HeroIllustration() {
   return (
     <motion.svg
-      width="400" height="380"
-      viewBox="0 0 400 380"
-      fill="none"
+      width="380" height="360" viewBox="0 0 400 380" fill="none"
       animate={{ y: [0, -10, 0] }}
       transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
       style={{ maxWidth: '100%' }}
     >
-      {/* Background blob */}
       <ellipse cx="200" cy="200" rx="170" ry="155" fill="var(--ice)" opacity="0.18"/>
 
-      {/* ── BOOK STACK ── */}
-      {/* Bottom book */}
-      <rect x="80" y="285" width="185" height="38" rx="7"
-        fill="var(--navy)" stroke="var(--outline)" strokeWidth="3"/>
-      <rect x="80" y="285" width="20" height="38" rx="5"
-        fill="var(--steel)" stroke="var(--outline)" strokeWidth="3"/>
-      <text x="178" y="309" textAnchor="middle"
-        fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--ice)" letterSpacing="1">
-        CONSTITUTION
-      </text>
+      {/* Book stack */}
+      <rect x="80" y="285" width="185" height="38" rx="7" fill="var(--navy)" stroke="var(--outline)" strokeWidth="3"/>
+      <rect x="80" y="285" width="20" height="38" rx="5" fill="var(--steel)" stroke="var(--outline)" strokeWidth="3"/>
+      <text x="178" y="309" textAnchor="middle" fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--ice)" letterSpacing="1">CONSTITUTION</text>
 
-      {/* Middle book */}
-      <rect x="90" y="251" width="165" height="38" rx="7"
-        fill="#7a1a1a" stroke="var(--outline)" strokeWidth="3"/>
-      <rect x="90" y="251" width="18" height="38" rx="5"
-        fill="#c0392b" stroke="var(--outline)" strokeWidth="3"/>
-      <text x="178" y="275" textAnchor="middle"
-        fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--parch)" letterSpacing="1">
-        IPC 1860
-      </text>
+      <rect x="90" y="251" width="165" height="38" rx="7" fill="#7a1a1a" stroke="var(--outline)" strokeWidth="3"/>
+      <rect x="90" y="251" width="18" height="38" rx="5" fill="#c0392b" stroke="var(--outline)" strokeWidth="3"/>
+      <text x="178" y="275" textAnchor="middle" fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--parch)" letterSpacing="1">IPC 1860</text>
 
-      {/* Top book */}
-      <rect x="100" y="219" width="145" height="36" rx="7"
-        fill="var(--gold)" stroke="var(--outline)" strokeWidth="3"/>
-      <rect x="100" y="219" width="16" height="36" rx="5"
-        fill="var(--gold-dark)" stroke="var(--outline)" strokeWidth="3"/>
-      <text x="178" y="242" textAnchor="middle"
-        fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--ink)" letterSpacing="1">
-        CrPC
-      </text>
+      <rect x="100" y="219" width="145" height="36" rx="7" fill="var(--gold)" stroke="var(--outline)" strokeWidth="3"/>
+      <rect x="100" y="219" width="16" height="36" rx="5" fill="var(--gold-dark)" stroke="var(--outline)" strokeWidth="3"/>
+      <text x="178" y="242" textAnchor="middle" fontFamily="Fredoka One, cursive" fontSize="11" fill="var(--ink)" letterSpacing="1">CrPC</text>
 
-      {/* ── SCALES OF JUSTICE ── */}
-      <g>
-        {/* Pole */}
-        <rect x="196" y="90" width="8" height="125" rx="4"
-          fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
-        {/* Base */}
-        <rect x="178" y="210" width="44" height="12" rx="6"
-          fill="var(--gold-dark)" stroke="var(--outline)" strokeWidth="2.5"/>
-        {/* Top knob */}
-        <circle cx="200" cy="90" r="8"
-          fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
-        {/* Cross beam */}
-        <rect x="145" y="124" width="110" height="8" rx="4"
-          fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
+      {/* Scales */}
+      <rect x="196" y="90" width="8" height="125" rx="4" fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
+      <rect x="178" y="210" width="44" height="12" rx="6" fill="var(--gold-dark)" stroke="var(--outline)" strokeWidth="2.5"/>
+      <circle cx="200" cy="90" r="8" fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
+      <rect x="145" y="124" width="110" height="8" rx="4" fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
 
-        {/* Left pan chain */}
-        <line x1="157" y1="132" x2="150" y2="163"
-          stroke="var(--outline)" strokeWidth="2.5" strokeDasharray="4 3"/>
-        {/* Left pan */}
-        <motion.g
-          animate={{ rotate: [0, 5, -3, 0] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ transformOrigin: '157px 132px' }}
-        >
-          <path d="M133 163 Q150 157 167 163 Q150 178 133 163Z"
-            fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
-        </motion.g>
+      <line x1="157" y1="132" x2="150" y2="163" stroke="var(--outline)" strokeWidth="2" strokeDasharray="4 3"/>
+      <motion.path d="M133 163 Q150 157 167 163 Q150 178 133 163Z"
+        fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"
+        animate={{ rotate: [0, 5, -3, 0] }}
+        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: '150px 163px' }}
+      />
 
-        {/* Right pan chain */}
-        <line x1="243" y1="132" x2="250" y2="155"
-          stroke="var(--outline)" strokeWidth="2" strokeDasharray="4 3"/>
-        {/* Right pan */}
-        <motion.g
-          animate={{ rotate: [0, -5, 3, 0] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
-          style={{ transformOrigin: '243px 132px' }}
-        >
-          <path d="M233 172 Q250 166 267 172 Q250 187 233 172Z"
-            fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"/>
-        </motion.g>
-      </g>
+      <line x1="243" y1="132" x2="250" y2="169" stroke="var(--outline)" strokeWidth="2" strokeDasharray="4 3"/>
+      <motion.path d="M233 172 Q250 166 267 172 Q250 187 233 172Z"
+        fill="var(--gold)" stroke="var(--outline)" strokeWidth="2.5"
+        animate={{ rotate: [0, -5, 3, 0] }}
+        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
+        style={{ transformOrigin: '250px 172px' }}
+      />
 
-      {/* ── GAVEL + HIT ── */}
+           {/* ── GAVEL + HIT ── */}
 <g transform="translate(160, 140) scale(0.45)">
   <g transform="rotate(35, 395, 340)">
     {/* Head */}
@@ -396,8 +330,7 @@ function HeroIllustration() {
   <rect x="260" y="340" width="180" height="22" rx="11" fill="#5d3a1a"/>
   <rect x="268" y="338" width="164" height="8" rx="4" fill="#7a4e28" opacity="0.45"/>
 </g>
-      
-      
+    
     </motion.svg>
   )
 }
@@ -413,26 +346,10 @@ function WaveDivider({ flip, fill }) {
 }
 
 const FEATURES = [
-  {
-    icon: '📜',
-    title: 'Statute Intelligence',
-    desc: 'Retrieves precise IPC, CrPC, and Constitutional sections. Every answer is grounded in a cited, verifiable source — no hallucinations.',
-  },
-  {
-    icon: '🎙',
-    title: 'Multi-Modal Input',
-    desc: 'Query via text, upload scanned court documents as images, or submit voice recordings. Whisper + CLIP handle all modalities.',
-  },
-  {
-    icon: '🕸',
-    title: 'Knowledge Graph',
-    desc: 'IPC sections link to landmark cases. Cases link to constitutional articles. Graph traversal reveals non-obvious legal connections.',
-  },
-  {
-    icon: '🔍',
-    title: 'Zero Hallucinations',
-    desc: 'Retrieval-augmented generation ensures every claim traces back to an ingested document. Sources are always shown.',
-  },
+  { icon: '📜', title: 'Statute Intelligence', desc: 'Retrieves precise IPC, CrPC, and Constitutional sections. Every answer is grounded in a cited, verifiable source — no hallucinations.' },
+  { icon: '🎙', title: 'Multi-Modal Input', desc: 'Query via text, upload scanned court documents as images, or submit voice recordings. Whisper + CLIP handle all modalities.' },
+  { icon: '🕸', title: 'Knowledge Graph', desc: 'IPC sections link to landmark cases. Cases link to constitutional articles. Graph traversal reveals non-obvious legal connections.' },
+  { icon: '🔍', title: 'Zero Hallucinations', desc: 'Retrieval-augmented generation ensures every claim traces back to an ingested document. Sources are always shown.' },
 ]
 
 const PIPELINE = [
@@ -441,6 +358,5 @@ const PIPELINE = [
   { icon: '🗄',  label: 'Qdrant Search' },
   { icon: '🕸',  label: 'Graph Enrich' },
   { icon: '🤖',  label: 'LLaMA 3.3 70B' },
-  { icon: '🔍',  label: 'Processing' },
   { icon: '📋',  label: 'Cited Answer' },
 ]

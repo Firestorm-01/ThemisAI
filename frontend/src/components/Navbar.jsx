@@ -166,7 +166,7 @@ export default function Navbar() {
       <style>{`
         @media (max-width: 768px) {
           .desktop-nav { display: none !important; }
-          .mobile-nav  { display: flex !important; }
+          .mobile-nav  { display: flex !important; min-height: unset !important; }
         }
         @media (min-width: 769px) {
           .mobile-nav  { display: none !important; }

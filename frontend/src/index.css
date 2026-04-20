@@ -160,3 +160,28 @@ input, textarea {
 
 .toast-success { border-color: var(--success); }
 .toast-error   { border-color: var(--danger); }
+
+/* â”€â”€ Mobile fixes â”€â”€ */
+@media (max-width: 767px) {
+  /* Prevent iOS zoom on inputs smaller than 16px */
+  input, textarea, select { font-size: 16px !important; }
+  /* Prevent pull-to-refresh overscroll */
+  body { overscroll-behavior-y: contain; }
+  /* Minimum tap target size */
+  button { min-height: 44px; }
+  /* Toast: full width, above safe area */
+  .toast-container {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    right: 0.75rem; left: 0.75rem;
+  }
+  .toast { max-width: 100%; }
+  .markdown-body { font-size: 0.88rem; }
+}
+@media (max-width: 380px) {
+  .btn { padding: 0.6rem 1.1rem; font-size: 0.9rem; }
+}
+
+/* Safe area padding for notched devices */
+.chat-root {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
