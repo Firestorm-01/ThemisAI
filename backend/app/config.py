@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
+    qdrant_api_key: str = ""  # add this for cloud
     upload_dir: str = "./uploads"
     text_collection: str = "themis_text"
     image_collection: str = "themis_images"

@@ -19,6 +19,8 @@ def get_qdrant_client() -> QdrantClient:
         _qdrant_client = QdrantClient(
             host=settings.qdrant_host,
             port=settings.qdrant_port,
+            api_key=settings.qdrant_api_key,  # add this
+            https=True,                        # add this for cloud
             timeout=30,
         )
         logger.info(f"Qdrant connected at {settings.qdrant_host}:{settings.qdrant_port}")
