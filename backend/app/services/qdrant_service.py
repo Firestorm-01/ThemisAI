@@ -17,10 +17,10 @@ def get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
         _qdrant_client = QdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port,
+            url=settings.qdrant_host,
+            
             api_key=settings.qdrant_api_key,  # add this
-            https=True,                        # add this for cloud
+                                 # add this for cloud
             timeout=30,
         )
         logger.info(f"Qdrant connected at {settings.qdrant_host}:{settings.qdrant_port}")
