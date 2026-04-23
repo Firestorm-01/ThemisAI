@@ -109,3 +109,54 @@ Based ONLY on the above retrieved documents and graph context, answer the query 
     except Exception as e:
         logger.error(f"Groq API error: {e}")
         raise RuntimeError(f"LLM generation failed: {str(e)}")
+
+
+def describe_image_with_llm(image_bytes: bytes, question: str) -> str:
+    """
+    Fallback for when CLIP is disabled.
+    Sends the image to Groq llama-3.2-11b-vision-preview for a legal description,
+    which is then used as the text query for Qdrant retrieval.
+    """
+    import base64
+    client = get_groq_client()
+    b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+
+    # Detect mime type from magic bytes
+    mime = "image/jpeg"
+    if image_bytes[:4] == b'\x89PNG':
+        mime = "image/png"
+    elif image_bytes[:4] == b'RIFF':
+        mime = "image/webp"
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{mime};base64,{b64}"},
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                f"You are analyzing a legal document image. "
+                                f"Describe all visible legal text, section numbers, "
+                                f"case names, and relevant legal content. "
+                                f"User question: {question}"
+                            ),
+                        },
+                    ],
+                }
+            ],
+            temperature=0.1,
+            max_tokens=400,
+        )
+        description = response.choices[0].message.content.strip()
+        logger.info(f"Image described via Groq vision: {len(description)} chars")
+        return description
+    except Exception as e:
+        logger.warning(f"Groq vision failed, falling back to question only: {e}")
+        return question

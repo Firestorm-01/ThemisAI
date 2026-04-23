@@ -7,13 +7,15 @@ pydantic-settings==2.2.1
 # Vector DB
 qdrant-client==1.9.1
 
-# Embeddings
+# Text embeddings — ~90MB RAM, always needed
 sentence-transformers==2.7.0
-torch==2.3.0
-torchvision==0.18.0
+# torch CPU-only to save ~200MB vs default torch
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.3.0+cpu
 transformers==4.41.0
+
+# Image processing (PIL only — no CLIP/torchvision on Render)
 Pillow==10.3.0
-open-clip-torch==2.24.0
 
 # PDF processing
 PyMuPDF==1.24.3
@@ -31,7 +33,7 @@ python-dotenv==1.0.1
 httpx==0.27.0
 aiofiles==23.2.1
 scikit-learn==1.5.0
-pytesseract>=0.3.10
-# Audio — only install locally or when ENABLE_VOICE=true
-# On Render free tier (512 MB), omit this line and set ENABLE_VOICE=false
-# openai-whisper==20231117
+
+# ── LOCAL ONLY (install manually for full feature set) ──
+# CLIP image embeddings (~350MB RAM): pip install open-clip-torch==2.24.0 torchvision==0.18.0
+# Voice/audio:                        pip install openai-whisper==20231117

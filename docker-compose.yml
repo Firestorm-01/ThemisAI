@@ -15,6 +15,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        ENABLE_IMAGE_EMBED: ${ENABLE_IMAGE_EMBED:-true}
+        ENABLE_VOICE: ${ENABLE_VOICE:-true}
     container_name: themis_backend
     ports:
       - "8000:8000"
@@ -23,6 +26,8 @@ services:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - UPLOAD_DIR=/app/uploads
+      - ENABLE_IMAGE_EMBED=${ENABLE_IMAGE_EMBED:-true}
+      - ENABLE_VOICE=${ENABLE_VOICE:-true}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/data:/app/data

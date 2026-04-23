@@ -1,12 +1,12 @@
 import logging
+import os
 import numpy as np
-from functools import lru_cache
 from sentence_transformers import SentenceTransformer
-from PIL import Image
-import open_clip
-import torch
 
 logger = logging.getLogger(__name__)
+
+# Set ENABLE_IMAGE_EMBED=false on Render to skip CLIP (saves ~350MB RAM)
+IMAGE_EMBED_ENABLED = os.getenv("ENABLE_IMAGE_EMBED", "true").lower() == "true"
 
 _text_embedder: SentenceTransformer = None
 _clip_model = None
@@ -24,7 +24,10 @@ def get_text_embedder() -> SentenceTransformer:
 
 def get_image_embedder():
     global _clip_model, _clip_preprocess, _clip_tokenizer
+    if not IMAGE_EMBED_ENABLED:
+        return None, None, None
     if _clip_model is None:
+        import open_clip
         _clip_model, _, _clip_preprocess = open_clip.create_model_and_transforms(
             "ViT-B-32", pretrained="openai"
         )
@@ -35,19 +38,20 @@ def get_image_embedder():
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Embed a list of text strings."""
     embedder = get_text_embedder()
     embeddings = embedder.encode(texts, normalize_embeddings=True, show_progress_bar=False)
     return embeddings.tolist()
 
 
 def embed_single_text(text: str) -> list[float]:
-    """Embed a single text string."""
     return embed_texts([text])[0]
 
 
-def embed_image(image: Image.Image) -> list[float]:
-    """Embed a PIL image using CLIP."""
+def embed_image(image) -> list[float]:
+    """Embed a PIL image using CLIP. Returns None if CLIP disabled."""
+    if not IMAGE_EMBED_ENABLED:
+        return None
+    import torch
     model, preprocess, _ = get_image_embedder()
     image_input = preprocess(image).unsqueeze(0)
     with torch.no_grad():
@@ -57,7 +61,10 @@ def embed_image(image: Image.Image) -> list[float]:
 
 
 def embed_image_text_query(text: str) -> list[float]:
-    """Embed a text query into CLIP's image space for cross-modal search."""
+    """Embed text into CLIP image space. Returns None if CLIP disabled."""
+    if not IMAGE_EMBED_ENABLED:
+        return None
+    import torch
     model, _, tokenizer = get_image_embedder()
     tokens = tokenizer([text])
     with torch.no_grad():
