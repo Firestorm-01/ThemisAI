@@ -1,14 +1,13 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-
 from app.routers import ingest, query, graph, health
 from app.core.startup import initialize_services
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,7 +17,6 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down ThemisAI backend.")
 
-
 app = FastAPI(
     title="ThemisAI API",
     description="Multi-Modal Graph RAG for Indian Law",
@@ -26,9 +24,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://themis-ai.vercel.app",
+    "https://themisai-te4r.onrender.com",
+    os.getenv("FRONTEND_URL", ""),         # set in Render env vars if needed
+]
+
+# Filter out empty strings (in case FRONTEND_URL is not set)
+ALLOWED_ORIGINS = [origin for origin in ALLOWED_ORIGINS if origin]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
