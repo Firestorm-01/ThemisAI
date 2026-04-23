@@ -1,6 +1,6 @@
 import uuid
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from qdrant_client.models import PointStruct
 
 from app.services.qdrant_service import get_qdrant_client, upsert_text_points, upsert_image_points
@@ -21,7 +21,9 @@ ALLOWED_EXTENSIONS = {
     "txt": "text",
 }
 
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB (reduced from 50MB to protect free tier)
+EMBED_BATCH_SIZE = 16             # smaller batches = lower peak RAM
+UPSERT_BATCH_SIZE = 50            # smaller upsert batches too
 
 
 def _get_modality(filename: str) -> str:
@@ -30,7 +32,7 @@ def _get_modality(filename: str) -> str:
 
 
 @router.post("/upload", response_model=IngestResponse)
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
 
@@ -38,12 +40,12 @@ async def upload_file(file: UploadFile = File(...)):
     if modality == "unknown":
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported file type. Allowed: PDF, images (PNG/JPG/WEBP), audio (MP3/WAV/M4A), TXT.",
+            detail="Unsupported file type. Allowed: PDF, images (PNG/JPG/WEBP), audio (MP3/WAV/M4A), TXT.",
         )
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File exceeds 50 MB limit.")
+        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit.")
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Empty file uploaded.")
 
@@ -53,17 +55,17 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         if modality == "pdf":
             chunks_created = await _ingest_pdf(content, file.filename, client)
-
         elif modality == "image":
             chunks_created = await _ingest_image(content, file.filename, client)
-
         elif modality == "audio":
             ext = file.filename.rsplit(".", 1)[-1].lower()
             chunks_created = await _ingest_audio(content, file.filename, ext, client)
-
         elif modality == "text":
             chunks_created = await _ingest_text(content, file.filename, client)
 
+    except MemoryError:
+        logger.error(f"OOM during ingest of {file.filename}")
+        raise HTTPException(status_code=507, detail="Server out of memory. Try a smaller file.")
     except Exception as e:
         logger.error(f"Ingest error [{file.filename}]: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
@@ -82,27 +84,34 @@ async def _ingest_pdf(content: bytes, filename: str, client) -> int:
     if not chunks:
         raise ValueError("No text could be extracted from PDF.")
 
-    texts = [c["text"] for c in chunks]
-    vectors = embed_texts(texts)
+    # Cap chunks to protect free tier memory
+    if len(chunks) > 200:
+        logger.warning(f"PDF {filename} has {len(chunks)} chunks, capping at 200.")
+        chunks = chunks[:200]
 
     points = []
-    for chunk, vector in zip(chunks, vectors):
-        points.append(PointStruct(
-            id=str(uuid.uuid4()),
-            vector=vector,
-            payload={
-                "text": chunk["text"],
-                "title": chunk["title"],
-                "page": chunk["page"],
-                "chunk_idx": chunk["chunk_idx"],
-                "file_name": filename,
-                "source_type": "pdf",
-            },
-        ))
+    # Embed in small batches to keep peak RAM low
+    for i in range(0, len(chunks), EMBED_BATCH_SIZE):
+        batch = chunks[i:i + EMBED_BATCH_SIZE]
+        texts = [c["text"] for c in batch]
+        vectors = embed_texts(texts)
 
-    # Batch upsert in groups of 100
-    for i in range(0, len(points), 100):
-        upsert_text_points(client, points[i:i + 100])
+        for chunk, vector in zip(batch, vectors):
+            points.append(PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vector,
+                payload={
+                    "text": chunk["text"],
+                    "title": chunk["title"],
+                    "page": chunk["page"],
+                    "chunk_idx": chunk["chunk_idx"],
+                    "file_name": filename,
+                    "source_type": "pdf",
+                },
+            ))
+
+        # Upsert each batch immediately to free memory
+        upsert_text_points(client, points[-len(batch):])
 
     logger.info(f"PDF ingested: {filename}, {len(points)} chunks")
     return len(points)
@@ -121,7 +130,6 @@ async def _ingest_image(content: bytes, filename: str, client) -> int:
     )
     upsert_image_points(client, [img_point])
 
-    # Also embed OCR text into text collection if useful
     if ocr_text and len(ocr_text) > 30:
         text_vector = embed_texts([ocr_text])[0]
         text_point = PointStruct(
@@ -149,30 +157,38 @@ async def _ingest_audio(content: bytes, filename: str, ext: str, client) -> int:
     if not transcript or len(transcript.strip()) < 10:
         raise ValueError("Audio transcription returned empty result.")
 
-    # Chunk transcript
     from app.services.text_ingest import chunk_plain_text
     chunks = chunk_plain_text(transcript, filename, source_type="audio")
-    texts = [c["text"] for c in chunks]
-    vectors = embed_texts(texts)
 
-    points = [
-        PointStruct(
-            id=str(uuid.uuid4()),
-            vector=vec,
-            payload={
-                "text": c["text"],
-                "title": f"Audio Transcript: {filename}",
-                "page": None,
-                "chunk_idx": c["chunk_idx"],
-                "file_name": filename,
-                "source_type": "audio",
-            },
-        )
-        for c, vec in zip(chunks, vectors)
-    ]
+    # Cap audio chunks too
+    if len(chunks) > 100:
+        chunks = chunks[:100]
 
-    upsert_text_points(client, points)
-    logger.info(f"Audio ingested: {filename}, transcript length: {len(transcript)}, {len(points)} chunks")
+    points = []
+    for i in range(0, len(chunks), EMBED_BATCH_SIZE):
+        batch = chunks[i:i + EMBED_BATCH_SIZE]
+        texts = [c["text"] for c in batch]
+        vectors = embed_texts(texts)
+
+        batch_points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vec,
+                payload={
+                    "text": c["text"],
+                    "title": f"Audio Transcript: {filename}",
+                    "page": None,
+                    "chunk_idx": c["chunk_idx"],
+                    "file_name": filename,
+                    "source_type": "audio",
+                },
+            )
+            for c, vec in zip(batch, vectors)
+        ]
+        upsert_text_points(client, batch_points)
+        points.extend(batch_points)
+
+    logger.info(f"Audio ingested: {filename}, {len(points)} chunks")
     return len(points)
 
 
