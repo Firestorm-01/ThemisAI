@@ -33,7 +33,7 @@ python-dotenv==1.0.1
 httpx==0.27.0
 aiofiles==23.2.1
 scikit-learn==1.5.0
-
+pytesseract>=0.3.10
 # ── LOCAL ONLY (install manually for full feature set) ──
 # CLIP image embeddings (~350MB RAM): pip install open-clip-torch==2.24.0 torchvision==0.18.0
 # Voice/audio:                        pip install openai-whisper==20231117
