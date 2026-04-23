@@ -8,11 +8,7 @@ pydantic-settings==2.2.1
 qdrant-client==1.9.1
 
 # Text embeddings — ~90MB RAM, always needed
-sentence-transformers==2.7.0
-# torch CPU-only to save ~200MB vs default torch
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.3.0+cpu
-transformers==4.41.0
+fastembed==0.2.7
 
 # Image processing (PIL only — no CLIP/torchvision on Render)
 Pillow==10.3.0
