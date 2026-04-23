@@ -27,7 +27,7 @@ app = FastAPI(
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://themis-ai.vercel.app",
+    "https://themis-ai-law.vercel.app",
     "https://themisai-te4r.onrender.com",
     os.getenv("FRONTEND_URL", ""),         # set in Render env vars if needed
 ]
